@@ -2,14 +2,21 @@ package proto
 
 import "time"
 
+type PatchKind string
+
+const (
+	PatchRaw    PatchKind = "none"
+	PatchBSDIFF PatchKind = "bsdiff"
+)
+
 type Response struct {
-	Available   bool    `json:"available"`
-	DownloadURL string  `json:"download_url"`
-	Checksum    string  `json:"checksum"`
-	Signature   string  `json:"signature"`
-	PatchType   string  `json:"patch_type"`
-	Version     string  `json:"version"`
-	Release     Release `json:"release"`
+	Available   bool      `json:"available"`
+	DownloadURL string    `json:"download_url"`
+	Checksum    string    `json:"checksum"`
+	Signature   string    `json:"signature"`
+	Patch       PatchKind `json:"patch_type"`
+	Version     string    `json:"version"`
+	Release     Release   `json:"release"`
 }
 
 type Request struct {
