@@ -2,6 +2,7 @@ package equinox
 
 import (
 	"crypto"
+	"errors"
 	"net/http"
 	"os"
 	"time"
@@ -10,6 +11,8 @@ import (
 )
 
 const protocolVersion = "1"
+
+var NotAvailableErr = errors.New("No update available")
 
 type Options struct {
 	// Channel specifies the name of an equinox.io release channel to check for
@@ -87,10 +90,11 @@ type Response struct {
 // an update for the given application matching the specified options is
 // available. The returned error is nil only if an update is available.
 //
-// The appID is issued to you when you create
+// The appID is issued to you when creating an application at https://equinox.io
 //
-// Use IsNotAvailable to differentiate between a successful check that found
-// no update from other errors like a failed network connection.
+// You can compare the returned error to NotAvailableErr to differentiate between
+// a successful check that found no update from other errors like a failed
+// network connection.
 func Check(appID string, opts Options) (Response, error) {
 	return Response{}, nil
 }
@@ -101,10 +105,4 @@ func Check(appID string, opts Options) (Response, error) {
 // Error is nil if and only if the entire update completes successfully.
 func Apply(r Response) error {
 	return nil
-}
-
-// Returns true if the error indicates that Check completed successfully but
-// did not find a suitable new version to update to.
-func IsNotAvailableError(err error) bool {
-	return err == notAvailable
 }
