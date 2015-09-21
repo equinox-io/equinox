@@ -103,6 +103,6 @@ func Check(appID string, opts Options) (Response, error) {
 // set on the Options) with the update specified by Response.
 //
 // Error is nil if and only if the entire update completes successfully.
-func Apply(r Response) error {
+func (r Response) Apply() error {
 	return nil
 }
