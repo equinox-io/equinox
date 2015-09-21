@@ -30,7 +30,7 @@ type Response struct {
 	DownloadURL string    `json:"download_url"`
 	Checksum    string    `json:"checksum"`
 	Signature   string    `json:"signature"`
-	Patch       PatchKind `json:"patch_type"`
+	Patch       PatchKind `json:"patch_type,string"`
 	Version     string    `json:"version"`
 	Release     Release   `json:"release"`
 }
