@@ -1,6 +1,6 @@
-# equinox client SDK
+# equinox client SDK [![godoc reference](https://godoc.org/github.com/equinox-io/equinox?status.png)](https://godoc.org/github.com/equinox-io/equinox)
 
-Package equinox allows applications to remotely update themselves with the equinox.io service.
+Package equinox allows applications to remotely update themselves with the [equinox.io](https://equinox.io) service.
 
 ## Minimal Working Example
 
