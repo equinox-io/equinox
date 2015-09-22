@@ -1,16 +1,28 @@
 package equinox
 
 import (
+	"bytes"
 	"crypto"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/pem"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/equinox-io/equinox/proto"
+	"github.com/inconshreveable/go-update"
+	"github.com/kardianos/osext"
 )
 
 const protocolVersion = "1"
+const defaultCheckURL = "https://update.equinox.io/check"
 
 var NotAvailableErr = errors.New("No update available")
 
@@ -64,7 +76,7 @@ type Options struct {
 
 	// HTTPClient is used to make all HTTP requests necessary for the update check protocol.
 	// You may configure it to use custom timeouts, proxy servers or other behaviors.
-	HTTPClient http.Client
+	HTTPClient *http.Client
 }
 
 // Response is returned by Check when an update is available. It may be
@@ -82,8 +94,28 @@ type Response struct {
 	// Creation date of the release
 	ReleaseDate time.Time
 
-	r    proto.Response
-	opts Options
+	downloadURL string
+	checksum    []byte
+	signature   []byte
+	patch       proto.PatchKind
+	opts        Options
+}
+
+// SetPublicKeyPEM is a convenience method to set the PublicKey property
+// used for checking a completed update's signature by parsing a
+// Public Key formatted as PEM data.
+func (o *Options) SetPublicKeyPEM(pembytes []byte) error {
+	block, _ := pem.Decode(pembytes)
+	if block == nil {
+		return errors.New("couldn't parse PEM data")
+	}
+
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return err
+	}
+	o.PublicKey = pub
+	return nil
 }
 
 // Check communicates with an equinox.io update service to determine if
@@ -96,7 +128,98 @@ type Response struct {
 // a successful check that found no update from other errors like a failed
 // network connection.
 func Check(appID string, opts Options) (Response, error) {
-	return Response{}, nil
+	var r Response
+
+	if opts.Channel == "" {
+		opts.Channel = "stable"
+	}
+	if opts.TargetPath == "" {
+		var err error
+		opts.TargetPath, err = osext.Executable()
+		if err != nil {
+			return r, err
+		}
+	}
+	if opts.OS == "" {
+		opts.OS = runtime.GOOS
+	}
+	if opts.Arch == "" {
+		opts.Arch = runtime.GOARCH
+	}
+	if opts.CheckURL == "" {
+		opts.CheckURL = defaultCheckURL
+	}
+	if opts.HTTPClient == nil {
+		opts.HTTPClient = new(http.Client)
+	}
+
+	checksum := computeChecksum(opts.TargetPath)
+
+	payload, err := json.Marshal(proto.Request{
+		AppID:          appID,
+		Channel:        opts.Channel,
+		OS:             opts.OS,
+		Arch:           opts.Arch,
+		GoARM:          opts.GoARM,
+		TargetVersion:  opts.Version,
+		CurrentVersion: opts.CurrentVersion,
+		CurrentSHA256:  checksum,
+	})
+
+	req, err := http.NewRequest("POST", opts.CheckURL, bytes.NewReader(payload))
+	if err != nil {
+		return r, err
+	}
+	req.Header.Set("Accept", fmt.Sprintf("application/json; version=%s; charset=utf-8", protocolVersion))
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	resp, err := opts.HTTPClient.Do(req)
+	if err != nil {
+		return r, err
+	}
+	defer resp.Body.Close()
+
+	var protoResp proto.Response
+	err = json.NewDecoder(resp.Body).Decode(&protoResp)
+	if err != nil {
+		return r, err
+	}
+
+	if !protoResp.Available {
+		return r, NotAvailableErr
+	}
+
+	r.ReleaseVersion = protoResp.Release.Version
+	r.ReleaseTitle = protoResp.Release.Title
+	r.ReleaseDescription = protoResp.Release.Description
+	r.ReleaseDate = protoResp.Release.CreateDate
+	r.downloadURL = protoResp.DownloadURL
+	r.patch = protoResp.Patch
+	r.opts = opts
+	r.checksum, err = hex.DecodeString(protoResp.Checksum)
+	if err != nil {
+		return r, err
+	}
+	r.signature, err = hex.DecodeString(protoResp.Signature)
+	if err != nil {
+		return r, err
+	}
+
+	return r, nil
+}
+
+func computeChecksum(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	h := sha256.New()
+	_, err = io.Copy(h, f)
+	if err != nil {
+		return ""
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // Apply performs an update of the current executable (or TargetFile, if it was
@@ -104,5 +227,29 @@ func Check(appID string, opts Options) (Response, error) {
 //
 // Error is nil if and only if the entire update completes successfully.
 func (r Response) Apply() error {
-	return nil
+	opts := update.Options{
+		TargetPath: r.opts.TargetPath,
+		TargetMode: r.opts.TargetMode,
+		Checksum:   r.checksum,
+		Signature:  r.signature,
+		Verifier:   update.NewECDSAVerifier(),
+		PublicKey:  r.opts.PublicKey,
+	}
+	switch r.patch {
+	case proto.PatchBSDiff:
+		opts.Patcher = update.NewBSDiffPatcher()
+	}
+
+	if err := opts.CheckPermissions(); err != nil {
+		return err
+	}
+
+	// fetch the update
+	resp, err := r.opts.HTTPClient.Get(r.downloadURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return update.Apply(resp.Body, opts)
 }

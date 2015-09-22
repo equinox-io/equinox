@@ -9,8 +9,8 @@ import "time"
 type PatchKind string
 
 const (
-	PatchRaw    PatchKind = "none"
-	PatchBSDIFF PatchKind = "bsdiff"
+	PatchNone   PatchKind = "none"
+	PatchBSDiff PatchKind = "bsdiff"
 )
 
 type Request struct {
