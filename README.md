@@ -77,9 +77,9 @@ fmt.Println("Version:", resp.ReleaseVersion)
 fmt.Println("Name:", resp.ReleaseTitle)
 fmt.Println("Details:", resp.ReleaseDescription)
 
-continue := prompt("Would you like to update?")
+ok := prompt("Would you like to update?")
 
-if !continue {
+if !ok {
     return
 }
 
