@@ -16,9 +16,9 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/equinox-io/equinox/internal/go-update"
+	"github.com/equinox-io/equinox/internal/osext"
 	"github.com/equinox-io/equinox/proto"
-	"github.com/inconshreveable/go-update"
-	"github.com/kardianos/osext"
 )
 
 const protocolVersion = "1"
