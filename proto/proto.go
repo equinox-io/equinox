@@ -1,6 +1,6 @@
 /*
 package proto defines a set of structures used to negotiate an update between an
-an application (the client) and an equinox update service.
+an application (the client) and an Equinox update service.
 */
 package proto
 

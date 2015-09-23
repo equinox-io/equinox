@@ -27,7 +27,7 @@ const defaultCheckURL = "https://update.equinox.io/check"
 var NotAvailableErr = errors.New("No update available")
 
 type Options struct {
-	// Channel specifies the name of an equinox.io release channel to check for
+	// Channel specifies the name of an Equinox release channel to check for
 	// a newer version of the application.
 	//
 	// If empty, defaults to 'stable'.
@@ -50,11 +50,12 @@ type Options struct {
 
 	// Target operating system of the update. Uses the same standard OS names used
 	// by Go build tags (windows, darwin, linux, etc).
-	// If empty, it will be populated by consulting runtime.GOOS()
+	// If empty, it will be populated by consulting runtime.GOOS
 	OS string
 
 	// Target architecture of the update. Uses the same standard Arch names used
 	// by Go build tags (amd64, 386, arm, etc).
+	// If empty, it will be populated by consulting runtime.GOARCH
 	Arch string
 
 	// Target ARM architecture, if a specific one if required. Uses the same names
@@ -70,8 +71,8 @@ type Options struct {
 	CurrentVersion string
 
 	// CheckURL is the URL to request an update check from. You should only set
-	// this if you are running an on-prem equinox server.
-	// If empty the default equinox update service endpoint is used.
+	// this if you are running an on-prem Equinox server.
+	// If empty the default Equinox update service endpoint is used.
 	CheckURL string
 
 	// HTTPClient is used to make all HTTP requests necessary for the update check protocol.
@@ -118,7 +119,7 @@ func (o *Options) SetPublicKeyPEM(pembytes []byte) error {
 	return nil
 }
 
-// Check communicates with an equinox.io update service to determine if
+// Check communicates with an Equinox update service to determine if
 // an update for the given application matching the specified options is
 // available. The returned error is nil only if an update is available.
 //
