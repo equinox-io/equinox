@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestNotAvailable(t *testing.T) {
-	opts := setup(t, "", proto.Response{
+	opts := setup(t, "TestNotAvailable", proto.Response{
 		Available: false,
 	})
 	defer cleanup(opts)
@@ -62,7 +62,7 @@ func TestNotAvailable(t *testing.T) {
 }
 
 func TestEndToEnd(t *testing.T) {
-	opts := setup(t, "TestNotAvailable", proto.Response{
+	opts := setup(t, "TestEndtoEnd", proto.Response{
 		Available: true,
 		Release: proto.Release{
 			Version:     "0.1.2.3",
