@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"runtime"
@@ -171,7 +172,7 @@ func Check(appID string, opts Options) (Response, error) {
 	if err != nil {
 		return r, err
 	}
-	req.Header.Set("Accept", fmt.Sprintf("application/json; version=%s; charset=utf-8", protocolVersion))
+	req.Header.Set("Accept", fmt.Sprintf("application/json; q=1; version=%s; charset=utf-8", protocolVersion))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
 	resp, err := opts.HTTPClient.Do(req)
@@ -179,6 +180,11 @@ func Check(appID string, opts Options) (Response, error) {
 		return r, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		return r, fmt.Errorf("Server responded with %s: %s", resp.Status, body)
+	}
 
 	var protoResp proto.Response
 	err = json.NewDecoder(resp.Body).Decode(&protoResp)
