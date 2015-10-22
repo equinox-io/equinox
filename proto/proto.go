@@ -31,7 +31,6 @@ type Response struct {
 	Checksum    string    `json:"checksum"`
 	Signature   string    `json:"signature"`
 	Patch       PatchKind `json:"patch_type"`
-	Version     string    `json:"version"`
 	Release     Release   `json:"release"`
 }
 
