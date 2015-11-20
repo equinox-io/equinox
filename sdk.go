@@ -256,7 +256,24 @@ func (r Response) Apply() error {
 	if err != nil {
 		return err
 	}
+
 	defer resp.Body.Close()
+
+	// check that we got a patch
+	if resp.StatusCode >= 400 {
+		msg := "error downloading patch"
+
+		id := resp.Header.Get("Request-Id")
+		if id != "" {
+			msg += ", request " + id
+		}
+
+		blob, err := ioutil.ReadAll(resp.Body)
+		if err == nil {
+			msg += ": " + string(bytes.TrimSpace(blob))
+		}
+		return fmt.Errorf(msg)
+	}
 
 	return update.Apply(resp.Body, opts)
 }
