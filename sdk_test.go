@@ -93,6 +93,35 @@ func TestEndToEnd(t *testing.T) {
 	}
 }
 
+func TestInvalidPatch(t *testing.T) {
+	opts := setup(t, "TestInavlidPatch", proto.Response{
+		Available: true,
+		Release: proto.Release{
+			Version:     "0.1.2.3",
+			Title:       "Release Title",
+			Description: "Release Description",
+			CreateDate:  time.Now(),
+		},
+		DownloadURL: "bad-request",
+		Checksum:    newSHA,
+		Signature:   signature,
+		Patch:       proto.PatchBSDiff,
+	})
+	defer cleanup(opts)
+
+	resp, err := Check(fakeAppID, opts)
+	if err != nil {
+		t.Fatalf("Failed check: %v", err)
+	}
+	err = resp.Apply()
+	if err == nil {
+		t.Fatalf("Apply succeeded")
+	}
+	if err.Error() != "error downloading patch: bad-request" {
+		t.Fatalf("Expected a different error message: %s", err)
+	}
+}
+
 func setup(t *testing.T, name string, resp proto.Response) Options {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/check", func(w http.ResponseWriter, r *http.Request) {
@@ -111,9 +140,18 @@ func setup(t *testing.T, name string, resp proto.Response) Options {
 		}
 		json.NewEncoder(w).Encode(resp)
 	})
-	mux.HandleFunc("/bin", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(newFakeBinary)
-	})
+
+	// Keying off the download URL may not be the best idea...
+	if resp.DownloadURL == "bad-request" {
+		mux.HandleFunc("/bin", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "bad-request", http.StatusBadRequest)
+		})
+	} else {
+		mux.HandleFunc("/bin", func(w http.ResponseWriter, r *http.Request) {
+			w.Write(newFakeBinary)
+		})
+	}
+
 	ts = httptest.NewServer(mux)
 	resp.DownloadURL = ts.URL + "/bin"
 

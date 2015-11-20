@@ -265,7 +265,7 @@ func (r Response) Apply() error {
 
 		blob, err := ioutil.ReadAll(resp.Body)
 		if err == nil {
-			msg += ": " + string(blob)
+			msg += ": " + string(bytes.TrimSpace(blob))
 		}
 		return fmt.Errorf(msg)
 	}
