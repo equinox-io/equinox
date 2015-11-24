@@ -24,6 +24,7 @@ import (
 
 const protocolVersion = "1"
 const defaultCheckURL = "https://update.equinox.io/check"
+const userAgent = "EquinoxSDK/1.0"
 
 var NotAvailableErr = errors.New("No update available")
 
@@ -174,6 +175,7 @@ func Check(appID string, opts Options) (Response, error) {
 	}
 	req.Header.Set("Accept", fmt.Sprintf("application/json; q=1; version=%s; charset=utf-8", protocolVersion))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := opts.HTTPClient.Do(req)
 	if err != nil {
