@@ -253,8 +253,14 @@ func (r Response) Apply() error {
 		return err
 	}
 
+	req, err := http.NewRequest("GET", r.downloadURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", userAgent)
+
 	// fetch the update
-	resp, err := r.opts.HTTPClient.Get(r.downloadURL)
+	resp, err := r.opts.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}

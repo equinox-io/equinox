@@ -123,12 +123,16 @@ func TestInvalidPatch(t *testing.T) {
 }
 
 func setup(t *testing.T, name string, resp proto.Response) Options {
+	checkUserAgent := func(req *http.Request) {
+		if req.Header.Get("User-Agent") != userAgent {
+			t.Errorf("Expected user agent to be %s, not %s", userAgent, req.Header.Get("User-Agent"))
+		}
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/check", func(w http.ResponseWriter, r *http.Request) {
+		checkUserAgent(r)
 		var req proto.Request
-		if r.Header.Get("User-Agent") != userAgent {
-			t.Errorf("Expected user agent to be %s, not %s", userAgent, r.Header.Get("User-Agent"))
-		}
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			t.Fatalf("Failed to decode proto request: %v", err)
@@ -147,10 +151,12 @@ func setup(t *testing.T, name string, resp proto.Response) Options {
 	// Keying off the download URL may not be the best idea...
 	if resp.DownloadURL == "bad-request" {
 		mux.HandleFunc("/bin", func(w http.ResponseWriter, r *http.Request) {
+			checkUserAgent(r)
 			http.Error(w, "bad-request", http.StatusBadRequest)
 		})
 	} else {
 		mux.HandleFunc("/bin", func(w http.ResponseWriter, r *http.Request) {
+			checkUserAgent(r)
 			w.Write(newFakeBinary)
 		})
 	}
