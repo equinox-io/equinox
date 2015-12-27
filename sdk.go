@@ -155,6 +155,7 @@ func Check(appID string, opts Options) (Response, error) {
 	if opts.HTTPClient == nil {
 		opts.HTTPClient = new(http.Client)
 	}
+	opts.HTTPClient.Transport = newUserAgentTransport(userAgent, opts.HTTPClient.Transport)
 
 	checksum := computeChecksum(opts.TargetPath)
 
@@ -175,7 +176,6 @@ func Check(appID string, opts Options) (Response, error) {
 	}
 	req.Header.Set("Accept", fmt.Sprintf("application/json; q=1; version=%s; charset=utf-8", protocolVersion))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := opts.HTTPClient.Do(req)
 	if err != nil {
@@ -257,7 +257,6 @@ func (r Response) Apply() error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", userAgent)
 
 	// fetch the update
 	resp, err := r.opts.HTTPClient.Do(req)
@@ -284,4 +283,23 @@ func (r Response) Apply() error {
 	}
 
 	return update.Apply(resp.Body, opts)
+}
+
+type userAgentTransport struct {
+	userAgent string
+	http.RoundTripper
+}
+
+func newUserAgentTransport(userAgent string, rt http.RoundTripper) *userAgentTransport {
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	return &userAgentTransport{userAgent, rt}
+}
+
+func (t *userAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.Header.Get("User-Agent") == "" {
+		r.Header.Set("User-Agent", t.userAgent)
+	}
+	return t.RoundTripper.RoundTrip(r)
 }
