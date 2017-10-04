@@ -2,6 +2,7 @@ package equinox
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
@@ -131,6 +132,11 @@ func (o *Options) SetPublicKeyPEM(pembytes []byte) error {
 // a successful check that found no update from other errors like a failed
 // network connection.
 func Check(appID string, opts Options) (Response, error) {
+	return CheckContext(context.Background(), appID, opts)
+}
+
+// CheckContext is like Check but includes a context.
+func CheckContext(ctx context.Context, appID string, opts Options) (Response, error) {
 	var r Response
 
 	if opts.Channel == "" {
@@ -174,6 +180,9 @@ func Check(appID string, opts Options) (Response, error) {
 	if err != nil {
 		return r, err
 	}
+
+	req = req.WithContext(ctx)
+
 	req.Header.Set("Accept", fmt.Sprintf("application/json; q=1; version=%s; charset=utf-8", protocolVersion))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
@@ -236,6 +245,11 @@ func computeChecksum(path string) string {
 //
 // Error is nil if and only if the entire update completes successfully.
 func (r Response) Apply() error {
+	return r.ApplyContext(context.Background())
+}
+
+// ApplyContext is like Apply but includes a context.
+func (r Response) ApplyContext(ctx context.Context) error {
 	opts := update.Options{
 		TargetPath: r.opts.TargetPath,
 		TargetMode: r.opts.TargetMode,
@@ -257,6 +271,8 @@ func (r Response) Apply() error {
 	if err != nil {
 		return err
 	}
+
+	req = req.WithContext(ctx)
 
 	// fetch the update
 	resp, err := r.opts.HTTPClient.Do(req)
