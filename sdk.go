@@ -185,6 +185,8 @@ func checkRequest(appID string, opts *Options) (*http.Request, error) {
 
 	req.Header.Set("Accept", fmt.Sprintf("application/json; q=1; version=%s; charset=utf-8", protocolVersion))
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req.Close = true
+
 	return req, err
 }
 
@@ -281,6 +283,7 @@ func (r Response) applyRequest() (*http.Request, update.Options, error) {
 
 func (r Response) applyUpdate(req *http.Request, opts update.Options) error {
 	// fetch the update
+	req.Close = true
 	resp, err := r.opts.HTTPClient.Do(req)
 	if err != nil {
 		return err
