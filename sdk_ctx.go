@@ -14,8 +14,7 @@ func CheckContext(ctx context.Context, appID string, opts Options) (Response, er
 		return Response{}, err
 	}
 
-	req = req.WithContext(ctx)
-	return doCheckRequest(opts, req)
+	return doCheckRequest(opts, req.WithContext(ctx))
 }
 
 // ApplyContext is like Apply but includes a context.
@@ -26,7 +25,5 @@ func (r Response) ApplyContext(ctx context.Context) error {
 		return err
 	}
 
-	req = req.WithContext(ctx)
-
-	return r.applyUpdate(req, opts)
+	return r.applyUpdate(req.WithContext(ctx), opts)
 }
