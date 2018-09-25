@@ -139,7 +139,7 @@ func setup(t *testing.T, name string, resp proto.Response) Options {
 		}
 		if resp.Available {
 			if req.AppID != fakeAppID {
-				t.Fatalf("Unexpected app ID. Got %v, expected %v", err)
+				t.Fatalf("Unexpected app ID. Got %v, expected %v", req.AppID, fakeAppID)
 			}
 			if req.CurrentSHA256 != sha {
 				t.Fatalf("Unexpected request SHA: %v", sha)
