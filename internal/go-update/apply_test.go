@@ -21,14 +21,25 @@ var (
 	newFileChecksum = sha256.Sum256(newFile)
 )
 
-func cleanup(path string) {
-	os.Remove(path)
-	os.Remove(fmt.Sprintf(".%s.new", path))
+func removeFile(t *testing.T, path string, failOnNewPathExists bool) {
+	t.Helper()
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	newPath := fmt.Sprintf(".%s.new", path)
+	if err := os.Remove(newPath); failOnNewPathExists && err == nil {
+		t.Fatalf("remove %v: %v", newPath, err)
+	}
+}
+
+func cleanup(t *testing.T) {
+	removeFile(t, t.Name(), true)
 }
 
 // we write with a separate name for each test so that we can run them in parallel
-func writeOldFile(path string, t *testing.T) {
-	if err := ioutil.WriteFile(path, oldFile, 0777); err != nil {
+func writeOldFile(t *testing.T) {
+	t.Helper()
+	if err := ioutil.WriteFile(t.Name(), oldFile, 0777); err != nil {
 		t.Fatalf("Failed to write file for testing preparation: %v", err)
 	}
 }
@@ -52,8 +63,8 @@ func TestApplySimple(t *testing.T) {
 	t.Parallel()
 
 	fName := "TestApplySimple"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
 	err := Apply(bytes.NewReader(newFile), Options{
 		TargetPath: fName,
@@ -65,8 +76,8 @@ func TestApplyOldSavePath(t *testing.T) {
 	t.Parallel()
 
 	fName := "TestApplyOldSavePath"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
 	oldfName := "OldSavePath"
 
@@ -80,29 +91,28 @@ func TestApplyOldSavePath(t *testing.T) {
 		t.Fatalf("Failed to find the old file: %v", err)
 	}
 
-	cleanup(oldfName)
+	removeFile(t, oldfName, false)
 }
 
 func TestVerifyChecksum(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestVerifyChecksum"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
 	err := Apply(bytes.NewReader(newFile), Options{
-		TargetPath: fName,
+		TargetPath: t.Name(),
 		Checksum:   newFileChecksum[:],
 	})
-	validateUpdate(fName, err, t)
+	validateUpdate(t.Name(), err, t)
 }
 
 func TestVerifyChecksumNegative(t *testing.T) {
 	t.Parallel()
 
 	fName := "TestVerifyChecksumNegative"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
 	badChecksum := []byte{0x0A, 0x0B, 0x0C, 0xFF}
 	err := Apply(bytes.NewReader(newFile), Options{
@@ -117,9 +127,8 @@ func TestVerifyChecksumNegative(t *testing.T) {
 func TestApplyPatch(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestApplyPatch"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
 	patch := new(bytes.Buffer)
 	err := binarydist.Diff(bytes.NewReader(oldFile), bytes.NewReader(newFile), patch)
@@ -128,22 +137,21 @@ func TestApplyPatch(t *testing.T) {
 	}
 
 	err = Apply(patch, Options{
-		TargetPath: fName,
+		TargetPath: t.Name(),
 		Patcher:    NewBSDiffPatcher(),
 	})
-	validateUpdate(fName, err, t)
+	validateUpdate(t.Name(), err, t)
 }
 
 func TestCorruptPatch(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestCorruptPatch"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
 	badPatch := []byte{0x44, 0x38, 0x86, 0x3c, 0x4f, 0x8d, 0x26, 0x54, 0xb, 0x11, 0xce, 0xfe, 0xc1, 0xc0, 0xf8, 0x31, 0x38, 0xa0, 0x12, 0x1a, 0xa2, 0x57, 0x2a, 0xe1, 0x3a, 0x48, 0x62, 0x40, 0x2b, 0x81, 0x12, 0xb1, 0x21, 0xa5, 0x16, 0xed, 0x73, 0xd6, 0x54, 0x84, 0x29, 0xa6, 0xd6, 0xb2, 0x1b, 0xfb, 0xe6, 0xbe, 0x7b, 0x70}
 	err := Apply(bytes.NewReader(badPatch), Options{
-		TargetPath: fName,
+		TargetPath: t.Name(),
 		Patcher:    NewBSDiffPatcher(),
 	})
 	if err == nil {
@@ -154,9 +162,8 @@ func TestCorruptPatch(t *testing.T) {
 func TestVerifyChecksumPatchNegative(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestVerifyChecksumPatchNegative"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
 	patch := new(bytes.Buffer)
 	anotherFile := []byte{0x77, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66}
@@ -166,7 +173,7 @@ func TestVerifyChecksumPatchNegative(t *testing.T) {
 	}
 
 	err = Apply(patch, Options{
-		TargetPath: fName,
+		TargetPath: t.Name(),
 		Checksum:   newFileChecksum[:],
 		Patcher:    NewBSDiffPatcher(),
 	})
@@ -265,11 +272,10 @@ func sign(parsePrivKey func([]byte) (crypto.Signer, error), privatePEM string, s
 func TestVerifyECSignature(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestVerifySignature"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
-	opts := Options{TargetPath: fName}
+	opts := Options{TargetPath: t.Name()}
 	err := opts.SetPublicKeyPEM([]byte(ecdsaPublicKey))
 	if err != nil {
 		t.Fatalf("Could not parse public key: %v", err)
@@ -277,15 +283,15 @@ func TestVerifyECSignature(t *testing.T) {
 
 	opts.Signature = signec(ecdsaPrivateKey, newFile, t)
 	err = Apply(bytes.NewReader(newFile), opts)
-	validateUpdate(fName, err, t)
+	validateUpdate(t.Name(), err, t)
 }
 
 func TestVerifyRSASignature(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestVerifySignature"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	fName := "TestVerifyRSASignature"
+	defer cleanup(t)
+	writeOldFile(t)
 
 	opts := Options{
 		TargetPath: fName,
@@ -298,18 +304,17 @@ func TestVerifyRSASignature(t *testing.T) {
 
 	opts.Signature = signrsa(rsaPrivateKey, newFile, t)
 	err = Apply(bytes.NewReader(newFile), opts)
-	validateUpdate(fName, err, t)
+	validateUpdate(t.Name(), err, t)
 }
 
 func TestVerifyFailBadSignature(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestVerifyFailBadSignature"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
 	opts := Options{
-		TargetPath: fName,
+		TargetPath: t.Name(),
 		Signature:  []byte{0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA},
 	}
 	err := opts.SetPublicKeyPEM([]byte(ecdsaPublicKey))
@@ -326,11 +331,10 @@ func TestVerifyFailBadSignature(t *testing.T) {
 func TestVerifyFailNoSignature(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestVerifySignatureWithPEM"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
-	opts := Options{TargetPath: fName}
+	opts := Options{TargetPath: t.Name()}
 	err := opts.SetPublicKeyPEM([]byte(ecdsaPublicKey))
 	if err != nil {
 		t.Fatalf("Could not parse public key: %v", err)
@@ -354,11 +358,10 @@ VBbP/Ff+05HOqwPC7rJMy1VAJLKg7Cw=
 func TestVerifyFailWrongSignature(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestVerifyFailWrongSignature"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
-	opts := Options{TargetPath: fName}
+	opts := Options{TargetPath: t.Name()}
 	err := opts.SetPublicKeyPEM([]byte(ecdsaPublicKey))
 	if err != nil {
 		t.Fatalf("Could not parse public key: %v", err)
@@ -374,12 +377,11 @@ func TestVerifyFailWrongSignature(t *testing.T) {
 func TestSignatureButNoPublicKey(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestSignatureButNoPublicKey"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
 	err := Apply(bytes.NewReader(newFile), Options{
-		TargetPath: fName,
+		TargetPath: t.Name(),
 		Signature:  signec(ecdsaPrivateKey, newFile, t),
 	})
 	if err == nil {
@@ -390,11 +392,10 @@ func TestSignatureButNoPublicKey(t *testing.T) {
 func TestPublicKeyButNoSignature(t *testing.T) {
 	t.Parallel()
 
-	fName := "TestPublicKeyButNoSignature"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer cleanup(t)
+	writeOldFile(t)
 
-	opts := Options{TargetPath: fName}
+	opts := Options{TargetPath: t.Name()}
 	if err := opts.SetPublicKeyPEM([]byte(ecdsaPublicKey)); err != nil {
 		t.Fatalf("Could not parse public key: %v", err)
 	}
@@ -405,10 +406,12 @@ func TestPublicKeyButNoSignature(t *testing.T) {
 }
 
 func TestWriteError(t *testing.T) {
-	t.Parallel()
-	fName := "TestWriteError"
-	defer cleanup(fName)
-	writeOldFile(fName, t)
+	defer removeFile(t, t.Name(), false)
+	writeOldFile(t)
+	oldOpenFile := openFile
+	defer func() {
+		openFile = oldOpenFile
+	}()
 
 	openFile = func(name string, flags int, perm os.FileMode) (*os.File, error) {
 		f, err := os.OpenFile(name, flags, perm)
@@ -419,8 +422,7 @@ func TestWriteError(t *testing.T) {
 		return f, err
 	}
 
-	err := Apply(bytes.NewReader(newFile), Options{TargetPath: fName})
-	if err == nil {
+	if err := Apply(bytes.NewReader(newFile), Options{TargetPath: t.Name()}); err == nil {
 		t.Fatalf("Allowed an update to an empty file")
 	}
 }
